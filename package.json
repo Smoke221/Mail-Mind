@@ -18,6 +18,8 @@
     "google-auth-library": "^9.7.0",
     "googleapis": "^134.0.0",
     "nodemon": "^3.1.0",
-    "openai": "^4.30.0"
+    "openai": "^4.30.0",
+    "passport": "^0.7.0",
+    "passport-outlook": "^3.0.0"
   }
 }

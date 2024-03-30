@@ -8,7 +8,7 @@ async function analyzeEmails(emailBody) {
     const n = 1;
 
     const openai = new OpenAI({
-      apikey: process.env.OPENAI_API_KEY,
+      apiKey: process.env.OPEN_AI_API_KEY,
     });
     const response = await openai.chat.completions.create({
       model: "gpt-3.5-turbo",

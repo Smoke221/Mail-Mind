@@ -1,7 +1,9 @@
 const express = require("express");
 const session = require('express-session');
+const passport = require('passport');
 require('dotenv').config();
 const { googleOauthRouter } = require("./routes/googleOauth");
+const { outlookOauthRouter } = require("./routes/outlookOauth");
 
 const app = express();
 
@@ -18,7 +20,11 @@ app.use(session({
   saveUninitialized: true,
 }));
 
+app.use(passport.initialize());
+app.use(passport.session());
+
 app.use("/", googleOauthRouter)
+app.use("/", outlookOauthRouter)
 
 const PORT = process.env.PORT || 3000;
 
