@@ -17,6 +17,7 @@
     "express-session": "^1.18.0",
     "google-auth-library": "^9.7.0",
     "googleapis": "^134.0.0",
-    "nodemon": "^3.1.0"
+    "nodemon": "^3.1.0",
+    "openai": "^4.30.0"
   }
 }

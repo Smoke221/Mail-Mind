@@ -1,6 +1,7 @@
 const express = require("express");
 const { OAuth2Client } = require("google-auth-library");
 const { google } = require("googleapis");
+const { analyzeEmails } = require("../controllers/openAiController");
 require("dotenv").config();
 
 const googleOauthRouter = express.Router();
@@ -52,30 +53,25 @@ googleOauthRouter.get("/fetch-emails", async (req, res) => {
     const emails = [];
 
     for (const message of messages) {
-        const email = await gmail.users.messages.get({
-          userId: "me",
-          id: message.id,
-          format: "full",
-          maxResults: 10,
-        });
-      
-        // Extract inforamtion that is necessary.
-        const headers = email.data.payload.headers;
-        const sender = headers.find(header => header.name === "From").value;
-        const receivedTime = new Date(parseInt(email.data.internalDate));
-        const messageBody = email.data.snippet;
-        //In the meta data snippet is the place where the actual information of an email is present.
-      
-        
-        const emailInfo = {
-          sender,
-          receivedTime,
-          messageBody
-        };
-      
-        // Pushing the emailInfo object into the emails array.
-        emails.push(emailInfo);
-      }
+      const email = await gmail.users.messages.get({
+        userId: "me",
+        id: message.id,
+        format: "full",
+        maxResults: 10,
+      });
+
+      // Extracting necessary information.
+      const headers = email.data.payload.headers;
+      const sender = headers.find((header) => header.name === "From").value;
+      const receivedTime = new Date(parseInt(email.data.internalDate));
+      const messageBody = email.data.snippet;
+
+      // Analyzing the email using OpenAI
+      let response = await analyzeEmails(
+        `I want you to serve as a professional email classifier, this is the body of the email  "${messageBody}", carefully analyze the email content to determine the intent behind the message.`
+      );
+      res.json(response);
+    }
 
     res.json(emails);
   } catch (error) {
