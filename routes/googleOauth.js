@@ -1,7 +1,7 @@
 const express = require("express");
 const { OAuth2Client } = require("google-auth-library");
 const { google } = require("googleapis");
-const { analyzeEmails } = require("../controllers/openAiController");
+const { analyzeEmails } = require("../controllers/geminiAPIController");
 require("dotenv").config();
 
 const googleOauthRouter = express.Router();
@@ -15,7 +15,11 @@ const client = new OAuth2Client(CLIENT_ID, CLIENT_SECRET, REDIRECT_URI);
 googleOauthRouter.get("/auth/google", (req, res) => {
   const authUrl = client.generateAuthUrl({
     access_type: "offline",
-    scope: ["https://www.googleapis.com/auth/gmail.readonly"],
+    scope: [
+      "https://www.googleapis.com/auth/gmail.readonly",
+      "https://www.googleapis.com/auth/gmail.modify",
+      "https://www.googleapis.com/auth/gmail.labels",
+    ],
   });
   res.redirect(authUrl);
 });
@@ -24,7 +28,6 @@ googleOauthRouter.get("/auth/google/callback", async (req, res) => {
   try {
     const { code } = req.query;
     const { tokens } = await client.getToken(code);
-    // Storing tokens securely in the session for further usage.
     req.session.tokens = tokens;
     res.send("Authentication successful!");
   } catch (error) {
@@ -47,37 +50,86 @@ googleOauthRouter.get("/fetch-emails", async (req, res) => {
 
     const response = await gmail.users.messages.list({
       userId: "me",
+      maxResults: 1,
     });
 
-    const messages = response.data.messages;
-    const emails = [];
-
-    for (const message of messages) {
-      const email = await gmail.users.messages.get({
-        userId: "me",
-        id: message.id,
-        format: "full",
-        maxResults: 10,
-      });
-
-      // Extracting necessary information.
-      const headers = email.data.payload.headers;
-      const sender = headers.find((header) => header.name === "From").value;
-      const receivedTime = new Date(parseInt(email.data.internalDate));
-      const messageBody = email.data.snippet;
-
-      // Analyzing the email using OpenAI
-      let response = await analyzeEmails(
-        `I want you to serve as a professional email classifier, this is the body of the email  "${messageBody}", carefully analyze the email content to determine the intent behind the message.`
-      );
-      res.json(response);
+    const latestMessage = response.data.messages[0];
+    if (!latestMessage) {
+      return res.status(404).send("No emails found.");
     }
 
-    res.json(emails);
+    const email = await gmail.users.messages.get({
+      userId: "me",
+      id: latestMessage.id,
+      format: "full",
+    });
+
+    const headers = email.data.payload.headers;
+    const sender = headers.find((header) => header.name === "From").value;
+    const receivedTime = new Date(parseInt(email.data.internalDate));
+    const messageBody = email.data.snippet;
+
+    const analyzedResponse = await analyzeEmails(
+      `Instructions:
+1. Read the email content carefully.
+2. Based on the content, categorize the email into one of the following categories:
+   - Interested: If the email indicates interest or positive sentiment towards the content.
+   - Not Interested: If the email indicates disinterest or negative sentiment towards the content.
+   - Need more Information: If the email requests further details or clarification.
+3. Choose the appropriate category and provide a label accordingly.
+
+Email Content:${messageBody}`
+    );
+
+    const label = classifyEmail(analyzedResponse);
+
+    const labelExists = await checkLabelExists(gmail, label);
+    if (!labelExists) {
+      await createLabel(gmail, label);
+    }
+
+    // Changing label of the email
+    const labelChanges = { addLabelIds: [label], removeLabelIds: ["INBOX"] };
+    await gmail.users.messages.modify({
+      userId: "me",
+      id: latestMessage.id,
+      resource: labelChanges,
+    });
+
+    res.json({
+      sender,
+      receivedTime,
+      messageBody,
+      analyzedResponse,
+      label,
+    });
   } catch (error) {
-    console.error("Error fetching emails:", error);
-    res.status(500).send("An error occurred while fetching emails.");
+    console.error("Error fetching latest email:", error);
+    res.status(500).send("An error occurred while fetching the latest email.");
   }
 });
+
+async function checkLabelExists(gmail, labelName) {
+  const labels = await gmail.users.labels.list({ userId: "me" });
+  return labels.data.labels.some((label) => label.name === labelName);
+}
+
+async function createLabel(gmail, labelName) {
+  await gmail.users.labels.create({
+    userId: "me",
+    requestBody: { name: labelName, labelListVisibility: "labelShow", messageListVisibility: "show" },
+  });
+}
+
+// Function to classify email based on analyzed response
+function classifyEmail(analyzedResponse) {
+  if (analyzedResponse.includes("Interested")) {
+    return "Interested";
+  } else if (analyzedResponse.includes("Not Interested")) {
+    return "Not Interested";
+  } else if (analyzedResponse.includes("Need more Information")) {
+    return "Need more Information";
+  }
+}
 
 module.exports = { googleOauthRouter };
