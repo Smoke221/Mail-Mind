@@ -1,7 +1,8 @@
 const express = require("express");
 const { OAuth2Client } = require("google-auth-library");
 const { google } = require("googleapis");
-const { analyzeEmails } = require("../controllers/geminiAPIController");
+const { generateText } = require("../controllers/geminiAPIController");
+const { sendAutomatedReply } = require("../controllers/sendMail");
 require("dotenv").config();
 
 const googleOauthRouter = express.Router();
@@ -40,7 +41,9 @@ googleOauthRouter.get("/fetch-emails", async (req, res) => {
   try {
     const tokens = req.session.tokens;
     if (!tokens) {
-      return res.status(401).send("Authentication tokens not found.");
+      return res
+        .status(401)
+        .send("Authentication tokens not found. Please login again.");
     }
 
     const oauth2Client = new google.auth.OAuth2();
@@ -62,14 +65,18 @@ googleOauthRouter.get("/fetch-emails", async (req, res) => {
       userId: "me",
       id: latestMessage.id,
       format: "full",
+      q: "is:unread",
     });
 
     const headers = email.data.payload.headers;
-    const sender = headers.find((header) => header.name === "From").value;
+    const senderHeader = headers.find((header) => header.name === "From").value;
+    const senderRegex = /(?:"?([^"]*)"?\s)?(?:<?(.+@[^>]+)>?)/;
+    const [, senderName, senderEmail] = senderHeader.match(senderRegex);
+    const sender = senderEmail;
     const receivedTime = new Date(parseInt(email.data.internalDate));
     const messageBody = email.data.snippet;
 
-    const analyzedResponse = await analyzeEmails(
+    const analyzedResponse = await generateText(
       `Instructions:
 1. Read the email content carefully.
 2. Based on the content, categorize the email into one of the following categories:
@@ -83,25 +90,54 @@ Email Content:${messageBody}`
 
     const label = classifyEmail(analyzedResponse);
 
-    const labelExists = await checkLabelExists(gmail, label);
-    if (!labelExists) {
-      await createLabel(gmail, label);
+    // const labelExists = await checkLabelExists(gmail, label);
+    // if (!labelExists) {
+    //   await createLabel(gmail, label);
+    // }
+
+    // // Changing label of the email
+    // const labelChanges = { addLabelIds: [label], removeLabelIds: ["INBOX"] };
+    // await gmail.users.messages.modify({
+    //   userId: "me",
+    //   id: latestMessage.id,
+    //   resource: labelChanges,
+    // });
+
+    let replyText;
+
+    // Determine reply text based on category
+    switch (label) {
+      case "Interested":
+        replyText = await generateText(
+          "As the user is interested, your reply should ask them if they are willing to hop on to a demo call by suggesting a time from your end. Write a small text on above request in around 70-90 words. Please note that provide some real timeslots (use GMT as default) instead of option1, option2, dont inlcude hi(welcoming message) and best regards(end message)"
+        );
+        break;
+      case "Not Interested":
+        replyText = await generateText(
+          "As the user is not interested, thank him for spending time to read the mail."
+        );
+        break;
+      case "Need more Information":
+        replyText = await generateText(
+          "The user needs more information on the product, ask whether they can provide more inforamtion."
+        );
+        break;
+      default:
+        replyText = "Thank you for your message.";
+        break;
     }
 
-    // Changing label of the email
-    const labelChanges = { addLabelIds: [label], removeLabelIds: ["INBOX"] };
-    await gmail.users.messages.modify({
-      userId: "me",
-      id: latestMessage.id,
-      resource: labelChanges,
-    });
+    // Send automated reply if necessary
+    if (replyText) {
+      await sendAutomatedReply(tokens, sender, replyText);
+    }
 
     res.json({
       sender,
-      receivedTime,
       messageBody,
       analyzedResponse,
       label,
+      replyText,
     });
   } catch (error) {
     console.error("Error fetching latest email:", error);
@@ -109,17 +145,17 @@ Email Content:${messageBody}`
   }
 });
 
-async function checkLabelExists(gmail, labelName) {
-  const labels = await gmail.users.labels.list({ userId: "me" });
-  return labels.data.labels.some((label) => label.name === labelName);
-}
+// async function checkLabelExists(gmail, labelName) {
+//   const labels = await gmail.users.labels.list({ userId: "me" });
+//   return labels.data.labels.some((label) => label.name === labelName);
+// }
 
-async function createLabel(gmail, labelName) {
-  await gmail.users.labels.create({
-    userId: "me",
-    requestBody: { name: labelName, labelListVisibility: "labelShow", messageListVisibility: "show" },
-  });
-}
+// async function createLabel(gmail, labelName) {
+//   await gmail.users.labels.create({
+//     userId: "me",
+//     requestBody: { name: labelName, labelListVisibility: "labelShow", messageListVisibility: "show" },
+//   });
+// }
 
 // Function to classify email based on analyzed response
 function classifyEmail(analyzedResponse) {

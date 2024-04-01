@@ -5,7 +5,7 @@ require("dotenv").config();
 const apiKey = process.env.GEMINI_API_KEY;
 const genAI = new GoogleGenerativeAI(apiKey);
 
-async function analyzeEmails(prompt) {
+async function generateText(prompt) {
   try {
     // For text-only input, use the gemini-pro model
     const model = genAI.getGenerativeModel({ model: "gemini-pro" });
@@ -20,4 +20,4 @@ async function analyzeEmails(prompt) {
   }
 }
 
-module.exports = { analyzeEmails };
+module.exports = { generateText };
