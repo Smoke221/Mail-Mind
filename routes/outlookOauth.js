@@ -47,6 +47,30 @@ const graphClient = Client.initWithMiddleware({
   }
 });
 
+/**
+ * @swagger
+ * tags:
+ *   name: Outlook
+ *   description: Operations related to Outlook integration
+ */
+
+/**
+ * @swagger
+ * /auth/outlook:
+ *   get:
+ *     summary: Initiate Outlook OAuth2 authentication
+ *     description: Redirects the user to the Outlook OAuth2 consent screen for authentication.
+ *     responses:
+ *       302:
+ *         description: Redirect to Outlook OAuth2 consent screen.
+ *         headers:
+ *           Location:
+ *             description: URL for Outlook OAuth2 consent screen.
+ *             schema:
+ *               type: string
+ *   tags: [Outlook]
+ */
+
 outlookOauthRouter.get(
   "/auth/outlook",
   passport.authenticate("windowslive", {
@@ -58,6 +82,23 @@ outlookOauthRouter.get(
     ],
   })
 );
+
+/**
+ * @swagger
+ * /auth/outlook/callback:
+ *   get:
+ *     summary: Handle Outlook OAuth2 callback
+ *     description: Handles the callback from Outlook OAuth2 authentication and redirects the user to the specified endpoint.
+ *     responses:
+ *       302:
+ *         description: Redirect to specified endpoint.
+ *         headers:
+ *           Location:
+ *             description: URL for redirection.
+ *             schema:
+ *               type: string
+ *   tags: [Outlook]
+ */
 
 outlookOauthRouter.get(
   "/auth/outlook/callback",

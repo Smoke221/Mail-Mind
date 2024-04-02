@@ -13,6 +13,30 @@ const REDIRECT_URI = process.env.REDIRECT_URI;
 
 const client = new OAuth2Client(CLIENT_ID, CLIENT_SECRET, REDIRECT_URI);
 
+/**
+ * @swagger
+ * tags:
+ *   name: Gmail
+ *   description: Operations related to Gmail integration
+ */
+
+/**
+ * @swagger
+ * /auth/google:
+ *   get:
+ *     summary: Initiate Google OAuth2 authentication
+ *     description: Redirects the user to the Google OAuth2 consent screen for authentication.
+ *     responses:
+ *       302:
+ *         description: Redirect to Google OAuth2 consent screen.
+ *         headers:
+ *           Location:
+ *             description: URL for Google OAuth2 consent screen.
+ *             schema:
+ *               type: string
+ *   tags: [Gmail]
+ */
+
 googleOauthRouter.get("/auth/google", (req, res) => {
   const authUrl = client.generateAuthUrl({
     access_type: "offline",
@@ -25,6 +49,27 @@ googleOauthRouter.get("/auth/google", (req, res) => {
   res.redirect(authUrl);
 });
 
+/**
+ * @swagger
+ * /auth/google/callback:
+ *   get:
+ *     summary: Handle Google OAuth2 callback
+ *     description: Handles the callback from Google OAuth2 authentication and saves the tokens.
+ *     parameters:
+ *       - in: query
+ *         name: code
+ *         required: true
+ *         description: Authorization code received from Google OAuth2.
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Authentication successful.
+ *       500:
+ *         description: An error occurred during authentication.
+ *   tags: [Gmail]
+ */
+
 googleOauthRouter.get("/auth/google/callback", async (req, res) => {
   try {
     const { code } = req.query;
@@ -36,6 +81,44 @@ googleOauthRouter.get("/auth/google/callback", async (req, res) => {
     res.status(500).send("An error occurred during authentication.");
   }
 });
+
+/**
+ * @swagger
+ * /fetch-emails:
+ *   get:
+ *     summary: Fetch the latest unread email
+ *     description: Fetches the latest unread email from the user's Gmail inbox, analyzes its content, categorizes it, and generates an automated reply.
+ *     responses:
+ *       200:
+ *         description: Latest email fetched successfully.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 sender:
+ *                   type: string
+ *                   description: Email address of the sender.
+ *                 messageBody:
+ *                   type: string
+ *                   description: Snippet of the email body.
+ *                 analyzedResponse:
+ *                   type: string
+ *                   description: Analyzed content of the email.
+ *                 label:
+ *                   type: string
+ *                   description: Categorized label of the email.
+ *                 replyText:
+ *                   type: string
+ *                   description: Generated automated reply text.
+ *       401:
+ *         description: Authentication tokens not found. Please login again.
+ *       404:
+ *         description: No emails found.
+ *       500:
+ *         description: An error occurred while fetching the latest email.
+ *   tags: [Gmail]
+ */
 
 googleOauthRouter.get("/fetch-emails", async (req, res) => {
   try {

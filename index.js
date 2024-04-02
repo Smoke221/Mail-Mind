@@ -1,9 +1,11 @@
 const express = require("express");
 const session = require('express-session');
 const passport = require('passport');
+const swaggerUi = require("swagger-ui-express")
 require('dotenv').config();
 const { googleOauthRouter } = require("./routes/googleOauth");
 const { outlookOauthRouter } = require("./routes/outlookOauth");
+const swaggerSpec = require("./swagger")
 // const pushNotificationController = require("./controllers/notification");
 
 const app = express();
@@ -16,6 +18,10 @@ app.use(session({
 }));
 app.use(passport.initialize());
 app.use(passport.session());
+
+app.set("trust proxy", true);
+
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec))
 
 // Routes
 app.get("/", (req, res) => {
