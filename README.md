@@ -1,4 +1,9 @@
-# Mail Mind
+# Mail Mind - *Smarter Emails*
+
+
+
+<img src="https://github.com/Smoke221/Mail-Mind/assets/114225283/ee579d96-bb44-44e3-ad58-6849364ec5d9" alt="Mail Mind Logo" width="200" height="200">
+
 
 Mail Mind is your go-to solution for effortless email management, seamlessly connecting with Gmail and Outlook APIs to upgrade your email game. Through secure OAuth2 authentication, Mail Mind taps into advanced natural language processing (NLP) to craft personalized automated responses tailored to each email's unique content. By automating email handling and responses, Mail Mind lets you reclaim precious time, ensuring prompt replies and boosting productivity in your email communication. Say goodbye to inbox overwhelm and hello to streamlined email management with Mail Mind.
 
